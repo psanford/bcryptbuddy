@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"golang.org/x/crypto/bcrypt"
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
 )
 
 func main() {
@@ -32,7 +32,7 @@ func hashCmd() *cobra.Command {
 		Short: "Hash a password via prompt",
 		Run: func(cmd *cobra.Command, args []string) {
 			fmt.Print("Password: ")
-			pw, err := terminal.ReadPassword(int(syscall.Stdin))
+			pw, err := term.ReadPassword(int(syscall.Stdin))
 			if err != nil {
 				log.Fatalf("Read password error: %s", err)
 			}
@@ -53,18 +53,30 @@ func hashCmd() *cobra.Command {
 	return cmd
 }
 
+var (
+	hashFlag string
+)
+
 func verifyCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "verify",
 		Short: "Verify a password matches a hash via prompt",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Print("Bcrypt Hash: ")
-			reader := bufio.NewReader(os.Stdin)
-			bcryptHash, err := reader.ReadBytes('\n')
-			if err != nil {
-				log.Fatalf("Read bcrypt hash error: %s", err)
+			var (
+				bcryptHash []byte
+				err        error
+			)
+			if hashFlag == "" {
+				fmt.Print("Bcrypt Hash: ")
+				reader := bufio.NewReader(os.Stdin)
+				bcryptHash, err = reader.ReadBytes('\n')
+				if err != nil {
+					log.Fatalf("Read bcrypt hash error: %s", err)
+				}
+				bcryptHash = bytes.TrimSpace(bcryptHash)
+			} else {
+				bcryptHash = []byte(hashFlag)
 			}
-			bcryptHash = bytes.TrimSpace(bcryptHash)
 
 			// check the hash is in a valid format before prompting for password
 			err = bcrypt.CompareHashAndPassword(bcryptHash, []byte(""))
@@ -73,7 +85,7 @@ func verifyCmd() *cobra.Command {
 			}
 
 			fmt.Print("Password: ")
-			pw, err := terminal.ReadPassword(int(syscall.Stdin))
+			pw, err := term.ReadPassword(int(syscall.Stdin))
 			if err != nil {
 				log.Fatalf("Read password error: %s", err)
 			}
@@ -92,5 +104,8 @@ func verifyCmd() *cobra.Command {
 			fmt.Println("ok")
 		},
 	}
+
+	cmd.Flags().StringVarP(&hashFlag, "hash", "", "", "Hash to verify (empty will prompt)")
+
 	return cmd
 }
